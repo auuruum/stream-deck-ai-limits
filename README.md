@@ -83,6 +83,9 @@ Select a key to configure it:
 - **Warning / Critical thresholds** — the percentages at which a bar turns yellow / orange.
   Used triggers at or above the threshold; Remaining triggers at or below it. Critical takes
   priority, and exhausted quota (100% used / 0% remaining) is red.
+- Refresh and threshold controls are **numeric fields with visible units** (`120 sec`, `20 %`,
+  `10 %`). Type an exact whole number and press Enter or leave the field to save; Escape restores
+  the saved value. Invalid values show a range error and do not overwrite your settings.
 - **Credentials path** — optional override if your credentials file is in a non-standard location.
   Leave empty to use the default. Setting this opts out of the macOS Keychain lookup: an explicit
   path is taken at face value, so a missing file there is reported as an error.

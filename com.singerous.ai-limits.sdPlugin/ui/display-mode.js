@@ -3,8 +3,8 @@
 	const client = SDPIComponents.streamDeckClient;
 	const modeSelect = document.querySelector('[setting="displayMode"]');
 	const providerSelect = document.querySelector('[setting="provider"]');
-	const warningRange = document.querySelector('[setting="warningThreshold"]');
-	const criticalRange = document.querySelector('[setting="criticalThreshold"]');
+	const warningInput = document.querySelector('[data-number-setting="warningThreshold"]');
+	const criticalInput = document.querySelector('[data-number-setting="criticalThreshold"]');
 	let settings = {};
 
 	function render(next) {
@@ -17,10 +17,16 @@
 			if (item) item.style.display = codex ? "" : "none";
 		}
 		document.getElementById("display-mode-help").textContent = remaining
-			? "Shows quota remaining. Lower percentages mean you are closer to the limit; colors change at or below the thresholds. Switching modes converts thresholds to keep the same warning levels."
-			: "Shows quota used. Higher percentages mean you are closer to the limit; colors change at or above the thresholds. Switching modes converts thresholds to keep the same warning levels.";
-		warningRange.setAttribute("default", remaining ? "20" : codex && settings.displayMode === "used" ? "80" : "70");
-		criticalRange.setAttribute("default", remaining ? "10" : "90");
+			? "Remaining quota. Colors change at or below the thresholds. Switching modes converts thresholds to preserve warning levels."
+			: "Used quota. Colors change at or above the thresholds. Switching modes converts thresholds to preserve warning levels.";
+		const warningDefault = remaining ? "20" : codex && settings.displayMode === "used" ? "80" : "70";
+		const criticalDefault = remaining ? "10" : "90";
+		for (const [input, value] of [[warningInput, warningDefault], [criticalInput, criticalDefault]]) {
+			if (input.dataset.default !== value) {
+				input.dataset.default = value;
+				input.dispatchEvent(new Event("defaultchange"));
+			}
+		}
 	}
 
 	client.didReceiveSettings.subscribe((event) => render(event.payload.settings));

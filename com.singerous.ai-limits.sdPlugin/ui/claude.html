@@ -2,6 +2,7 @@
 <html>
 	<head lang="en">
 		<meta charset="utf-8" />
+		<link rel="stylesheet" href="settings.css" />
 		<title>Claude Usage Settings</title>
 		<script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
 	</head>
@@ -10,16 +11,28 @@
 			Settings auto-persist to the action via the `setting` attribute and apply live in the
 			plugin (onDidReceiveSettings). Components: https://sdpi-components.dev/docs/components
 		-->
-		<sdpi-item label="Refresh interval (sec)">
-			<sdpi-range setting="refreshIntervalSec" min="60" max="600" step="5" default="120" showlabels></sdpi-range>
+		<sdpi-item label="Refresh every">
+			<div class="number-setting">
+				<input type="number" data-number-setting="refreshIntervalSec" data-default="120" min="60" max="600" step="1" value="120" aria-label="Refresh interval in seconds" />
+				<span class="number-setting-unit">sec</span>
+				<small class="number-setting-error" role="status"></small>
+			</div>
 		</sdpi-item>
 
-		<sdpi-item label="Warning at (%)">
-			<sdpi-range setting="warningThreshold" min="0" max="100" step="5" default="70" showlabels></sdpi-range>
+		<sdpi-item label="Warning at">
+			<div class="number-setting">
+				<input type="number" data-number-setting="warningThreshold" data-default="70" min="0" max="100" step="1" value="70" aria-label="Warning threshold in percent" />
+				<span class="number-setting-unit">%</span>
+				<small class="number-setting-error" role="status"></small>
+			</div>
 		</sdpi-item>
 
-		<sdpi-item label="Critical at (%)">
-			<sdpi-range setting="criticalThreshold" min="0" max="100" step="5" default="90" showlabels></sdpi-range>
+		<sdpi-item label="Critical at">
+			<div class="number-setting">
+				<input type="number" data-number-setting="criticalThreshold" data-default="90" min="0" max="100" step="1" value="90" aria-label="Critical threshold in percent" />
+				<span class="number-setting-unit">%</span>
+				<small class="number-setting-error" role="status"></small>
+			</div>
 		</sdpi-item>
 
 		<sdpi-item label="Credentials path">
@@ -34,5 +47,6 @@
 				Leave the path empty to use the default Claude Code credentials location.
 			</small>
 		</sdpi-item>
+		<script src="numeric-settings.js"></script>
 	</body>
 </html>
