@@ -22,6 +22,28 @@ test("statusForPercent: custom thresholds", () => {
 	assert.equal(statusForPercent(80, { warning: 50, critical: 80 }), "critical");
 });
 
+test("Used 80/90 thresholds: warning, critical, healthy and inclusive boundaries", () => {
+	const thresholds = { warning: 80, critical: 90 };
+	assert.equal(statusForPercent(85, thresholds, "used"), "warning");
+	assert.equal(statusForPercent(95, thresholds, "used"), "critical");
+	assert.equal(statusForPercent(79, thresholds, "used"), "ok");
+	assert.equal(statusForPercent(80, thresholds, "used"), "warning");
+	assert.equal(statusForPercent(90, thresholds, "used"), "critical");
+});
+
+test("Remaining 20/10 thresholds: lower is worse, critical wins", () => {
+	const thresholds = { warning: 20, critical: 10 };
+	assert.equal(statusForPercent(15, thresholds, "remaining"), "warning");
+	assert.equal(statusForPercent(5, thresholds, "remaining"), "critical");
+	assert.equal(statusForPercent(80, thresholds, "remaining"), "ok");
+	assert.equal(statusForPercent(90, thresholds, "remaining"), "ok");
+	assert.equal(statusForPercent(21, thresholds, "remaining"), "ok");
+	assert.equal(statusForPercent(20, thresholds, "remaining"), "warning");
+	assert.equal(statusForPercent(10, thresholds, "remaining"), "critical");
+	assert.equal(statusForPercent(0, thresholds, "remaining"), "limited");
+	assert.equal(statusForPercent(20, { warning: 20, critical: 20 }, "remaining"), "critical");
+});
+
 test("worstStatus: picks the more severe of the two windows", () => {
 	assert.equal(worstStatus(w(10), w(95)), "critical");
 	assert.equal(worstStatus(w(75), w(20)), "warning");

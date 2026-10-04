@@ -11,6 +11,8 @@ import type { Provider, UsageProvider, UsageSnapshot } from "../providers/types.
 import { renderUsageIcon, toDataUrl } from "../render/usage-icon.ts";
 import {
 	resolveUsageSettings,
+	initializeUsageSettings,
+	updateDisplayModeSettings,
 	sameResolvedSettings,
 	type ResolvedUsageSettings,
 	type UsageActionSettings,
@@ -24,6 +26,7 @@ interface KeyRuntime {
 	action: KeyAction;
 	provider: Provider;
 	config: ResolvedUsageSettings;
+	rawSettings: UsageActionSettings;
 	timer: ReturnType<typeof setInterval>;
 }
 
@@ -45,7 +48,12 @@ export abstract class UsageActionBase extends SingletonAction<UsageActionSetting
 		if (!ev.action.isKey()) {
 			return;
 		}
-		const runtime = this.ensureRuntime(ev.action, ev.payload.settings);
+		const settings = this.providerId === "codex"
+			? initializeUsageSettings(ev.payload.settings, this.providerId) : ev.payload.settings;
+		if (settings !== ev.payload.settings) {
+			await ev.action.setSettings(settings);
+		}
+		const runtime = this.ensureRuntime(ev.action, settings);
 		await this.refresh(runtime, { force: false });
 		this.startTimer(runtime);
 	}
@@ -71,13 +79,19 @@ export abstract class UsageActionBase extends SingletonAction<UsageActionSetting
 		if (!ev.action.isKey()) {
 			return;
 		}
-		const runtime = this.ensureRuntime(ev.action, ev.payload.settings);
+		const previous = this.instances.get(ev.action.id)?.rawSettings;
+		const settings = previous
+			? updateDisplayModeSettings(previous, ev.payload.settings, this.providerId) : ev.payload.settings;
+		const runtime = this.ensureRuntime(ev.action, settings);
+		if (settings !== ev.payload.settings) {
+			await ev.action.setSettings(settings);
+		}
 		this.startTimer(runtime);
 		await this.refresh(runtime, { force: false });
 	}
 
 	private ensureRuntime(keyAction: KeyAction, rawSettings: UsageActionSettings): KeyRuntime {
-		const resolved = resolveUsageSettings(rawSettings);
+		const resolved = resolveUsageSettings(rawSettings, this.providerId);
 		const existing = this.instances.get(keyAction.id);
 
 		// Rebuild the provider only if config that affects fetching changed (or first appearance).
@@ -89,6 +103,7 @@ export abstract class UsageActionBase extends SingletonAction<UsageActionSetting
 				action: keyAction,
 				provider: this.createProvider(resolved),
 				config: resolved,
+				rawSettings,
 				timer: undefined as unknown as ReturnType<typeof setInterval>,
 			};
 			this.instances.set(keyAction.id, runtime);
@@ -96,6 +111,8 @@ export abstract class UsageActionBase extends SingletonAction<UsageActionSetting
 		}
 
 		existing.action = keyAction; // keep the live action reference fresh
+		existing.config = resolved; // display-only changes do not rebuild a provider or discard its cache
+		existing.rawSettings = rawSettings;
 		return existing;
 	}
 
@@ -122,6 +139,6 @@ export abstract class UsageActionBase extends SingletonAction<UsageActionSetting
 				stale: false,
 			};
 		}
-		await runtime.action.setImage(toDataUrl(renderUsageIcon(snapshot)));
+		await runtime.action.setImage(toDataUrl(renderUsageIcon(snapshot, new Date(), runtime.config.displayMode)));
 	}
 }

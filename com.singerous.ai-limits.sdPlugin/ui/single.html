@@ -55,6 +55,16 @@
 			<sdpi-range setting="refreshIntervalSec" min="60" max="600" step="5" default="120" showlabels></sdpi-range>
 		</sdpi-item>
 
+		<sdpi-item label="Display mode" id="display-mode-item">
+			<sdpi-select setting="displayMode" default="used">
+				<option value="remaining">Remaining</option>
+				<option value="used">Used</option>
+			</sdpi-select>
+		</sdpi-item>
+		<sdpi-item id="display-mode-help-item">
+			<small id="display-mode-help" style="color: var(--sdpi-color-muted, #999);"></small>
+		</sdpi-item>
+
 		<sdpi-item label="Warning at (%)">
 			<sdpi-range setting="warningThreshold" min="0" max="100" step="5" default="70" showlabels></sdpi-range>
 		</sdpi-item>
@@ -66,5 +76,6 @@
 		<sdpi-item label="Credentials path">
 			<sdpi-textfield setting="customCredentialsPath" placeholder="Default per provider"></sdpi-textfield>
 		</sdpi-item>
+		<script src="display-mode.js"></script>
 	</body>
 </html>

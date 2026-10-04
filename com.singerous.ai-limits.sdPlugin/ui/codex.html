@@ -5,13 +5,23 @@
 		<title>Codex Usage Settings</title>
 		<script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
 	</head>
-	<body>
+	<body data-provider="codex">
 		<!--
 			Settings auto-persist to the action via the `setting` attribute and apply live in the
 			plugin (onDidReceiveSettings). Components: https://sdpi-components.dev/docs/components
 		-->
 		<sdpi-item label="Refresh interval (sec)">
 			<sdpi-range setting="refreshIntervalSec" min="60" max="600" step="5" default="120" showlabels></sdpi-range>
+		</sdpi-item>
+
+		<sdpi-item label="Display mode">
+			<sdpi-select setting="displayMode" default="used">
+				<option value="remaining">Remaining</option>
+				<option value="used">Used</option>
+			</sdpi-select>
+		</sdpi-item>
+		<sdpi-item>
+			<small id="display-mode-help" style="color: var(--sdpi-color-muted, #999);"></small>
 		</sdpi-item>
 
 		<sdpi-item label="Warning at (%)">
@@ -31,5 +41,6 @@
 				Leave the path empty to use the default Codex credentials location.
 			</small>
 		</sdpi-item>
+		<script src="display-mode.js"></script>
 	</body>
 </html>

@@ -2,6 +2,7 @@ import { statusForPercent } from "../providers/status.ts";
 import type { StatusThresholds, UsageSnapshot, UsageStatus, UsageWindow } from "../providers/types.ts";
 import { DEFAULT_THRESHOLDS } from "../providers/types.ts";
 import { formatCountdown } from "../utils/time.ts";
+import { convertThresholds, getDisplayPercent, type DisplayMode } from "../utils/usage-display.ts";
 import { paletteForStatus, type Palette } from "./colors.ts";
 import { SIZE, escapeXml, toDataUrl } from "./svg.ts";
 
@@ -21,7 +22,7 @@ export { toDataUrl };
  *
  * @param now Clock used for the Copilot reset countdown; defaults to `new Date()`.
  */
-export function renderUsageIcon(snapshot: UsageSnapshot, now: Date = new Date()): string {
+export function renderUsageIcon(snapshot: UsageSnapshot, now: Date = new Date(), displayMode: DisplayMode = "used"): string {
 	const status = snapshot.status;
 	const label = providerLabel(snapshot.provider);
 
@@ -30,11 +31,12 @@ export function renderUsageIcon(snapshot: UsageSnapshot, now: Date = new Date())
 	}
 
 	// No usable numbers at all → treat as a generic message even if status looked ok.
-	if (snapshot.session.usedPercent === null && snapshot.weekly.usedPercent === null) {
+	if (getDisplayPercent(snapshot.session.usedPercent, "used") === null &&
+		getDisplayPercent(snapshot.weekly.usedPercent, "used") === null) {
 		return renderMessage("error", [label, "No", "Data"]);
 	}
 
-	return renderBars(snapshot, now);
+	return renderBars(snapshot, now, snapshot.provider === "codex" ? displayMode : "used");
 }
 
 /** Short display name shown on the key for each provider. */
@@ -50,8 +52,10 @@ function providerLabel(provider: UsageSnapshot["provider"]): string {
 	}
 }
 
-function renderBars(snapshot: UsageSnapshot, now: Date): string {
-	const thresholds = snapshot.thresholds ?? DEFAULT_THRESHOLDS;
+function renderBars(snapshot: UsageSnapshot, now: Date, displayMode: DisplayMode): string {
+	const thresholds = convertThresholds(snapshot.thresholds ?? DEFAULT_THRESHOLDS, "used", displayMode);
+	const sessionPercent = getDisplayPercent(snapshot.session.usedPercent, displayMode);
+	const weeklyPercent = getDisplayPercent(snapshot.weekly.usedPercent, displayMode);
 	const stale = snapshot.status === "stale";
 
 	// Stale data still shows real numbers with normal per-bar colors (the values are the
@@ -59,8 +63,8 @@ function renderBars(snapshot: UsageSnapshot, now: Date): string {
 	// transient rate-limit windows from turning the whole key an alarming grey. We use the normal
 	// (non-stale) palette for text/background so it reads as live data.
 	const palette = paletteForStatus("ok");
-	const sessionAccent = accentForWindow(snapshot.session, thresholds);
-	const weeklyAccent = accentForWindow(snapshot.weekly, thresholds);
+	const sessionAccent = accentForPercent(sessionPercent, thresholds, displayMode);
+	const weeklyAccent = accentForPercent(weeklyPercent, thresholds, displayMode);
 
 	const staleDot = stale
 		? `<circle cx="${SIZE - 9}" cy="9" r="3" fill="${palette.textMuted}"><title>data is stale (refresh pending)</title></circle>`
@@ -72,9 +76,9 @@ function renderBars(snapshot: UsageSnapshot, now: Date): string {
 
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">
   <rect width="${SIZE}" height="${SIZE}" fill="${palette.background}"/>
-  ${barRow(8, "5H", snapshot.session, palette.text, palette.track, sessionAccent)}
+  ${barRow(8, "5H", sessionPercent, palette.text, palette.track, sessionAccent, 22, displayMode === "remaining" ? sessionAccent : palette.text)}
   <line x1="12" y1="72" x2="${SIZE - 12}" y2="72" stroke="${palette.track}" stroke-width="1"/>
-  ${barRow(80, "W", snapshot.weekly, palette.text, palette.track, weeklyAccent)}
+  ${barRow(80, "W", weeklyPercent, palette.text, palette.track, weeklyAccent, 22, displayMode === "remaining" ? weeklyAccent : palette.text)}
   ${staleDot}
 </svg>`;
 }
@@ -97,7 +101,7 @@ function renderCopilotBars(
 
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">
   <rect width="${SIZE}" height="${SIZE}" fill="${palette.background}"/>
-  ${barRow(8, label, window, palette.text, palette.track, accent, 16)}
+  ${barRow(8, label, getDisplayPercent(window.usedPercent, "used"), palette.text, palette.track, accent, 16)}
   <line x1="12" y1="72" x2="${SIZE - 12}" y2="72" stroke="${palette.track}" stroke-width="1"/>
   <text x="${SIZE / 2}" y="112" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="18" font-weight="700" fill="${palette.text}">${escapeXml(resetText)}</text>
   ${staleDot}
@@ -105,30 +109,31 @@ function renderCopilotBars(
 }
 
 /** Accent color for one bar, derived from its own percentage and the configured thresholds. */
-function accentForWindow(window: UsageWindow, thresholds: StatusThresholds): string {
-	if (window.usedPercent === null) {
+function accentForPercent(percent: number | null, thresholds: StatusThresholds, displayMode: DisplayMode): string {
+	if (percent === null) {
 		return paletteForStatus("ok").accent;
 	}
-	return paletteForStatus(statusForPercent(window.usedPercent, thresholds)).accent;
+	return paletteForStatus(statusForPercent(Math.round(percent), thresholds, displayMode)).accent;
 }
 
 function barRow(
 	top: number,
 	label: string,
-	window: UsageWindow,
+	percent: number | null,
 	textColor: string,
 	trackColor: string,
 	accentColor: string,
 	valueFontSize = 22,
+	valueColor = textColor,
 ): string {
-	const hasValue = window.usedPercent !== null;
-	const clamped = hasValue ? Math.max(0, Math.min(100, Math.round(window.usedPercent as number))) : 0;
+	const hasValue = percent !== null;
+	const clamped = hasValue ? Math.round(percent) : 0;
 	const valueText = hasValue ? `${clamped}%` : "—";
 	const barWidth = Math.round((120 * clamped) / 100);
 
 	return `
   <text x="12" y="${top + 22}" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="${textColor}">${escapeXml(label)}</text>
-  <text x="${SIZE - 12}" y="${top + 22}" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="${valueFontSize}" font-weight="700" fill="${textColor}">${escapeXml(valueText)}</text>
+  <text x="${SIZE - 12}" y="${top + 22}" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="${valueFontSize}" font-weight="700" fill="${hasValue ? valueColor : textColor}">${escapeXml(valueText)}</text>
   <rect x="12" y="${top + 34}" width="120" height="12" rx="6" fill="${trackColor}"/>
   ${barWidth > 0 ? `<rect x="12" y="${top + 34}" width="${barWidth}" height="12" rx="6" fill="${accentColor}"/>` : ""}`;
 }

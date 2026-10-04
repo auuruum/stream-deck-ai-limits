@@ -17,6 +17,8 @@ import { toDataUrl } from "../render/svg.ts";
 import {
 	resolveSingleWindowSettings,
 	resolveUsageSettings,
+	initializeUsageSettings,
+	updateDisplayModeSettings,
 	sameResolvedSettings,
 	sameSingleWindowSettings,
 	type ResolvedSingleWindowSettings,
@@ -33,6 +35,7 @@ interface KeyRuntime {
 	provider: Provider;
 	usageConfig: ResolvedUsageSettings;
 	displayConfig: ResolvedSingleWindowSettings;
+	rawSettings: UsageActionSettings;
 	/** Data refresh timer (network, at the configured interval). */
 	dataTimer: ReturnType<typeof setInterval>;
 	/** Countdown redraw timer (cache only, every minute). */
@@ -54,7 +57,11 @@ export class SingleWindowAction extends SingletonAction<UsageActionSettings> {
 		if (!ev.action.isKey()) {
 			return;
 		}
-		const runtime = this.ensureRuntime(ev.action, ev.payload.settings);
+		const settings = initializeUsageSettings(ev.payload.settings, resolveSingleWindowSettings(ev.payload.settings).provider);
+		if (settings !== ev.payload.settings) {
+			await ev.action.setSettings(settings);
+		}
+		const runtime = this.ensureRuntime(ev.action, settings);
 		await this.refresh(runtime, { force: false });
 		this.startTimers(runtime);
 	}
@@ -80,7 +87,12 @@ export class SingleWindowAction extends SingletonAction<UsageActionSettings> {
 		if (!ev.action.isKey()) {
 			return;
 		}
-		const runtime = this.ensureRuntime(ev.action, ev.payload.settings);
+		const previous = this.instances.get(ev.action.id)?.rawSettings;
+		const settings = previous ? updateDisplayModeSettings(previous, ev.payload.settings) : ev.payload.settings;
+		const runtime = this.ensureRuntime(ev.action, settings);
+		if (settings !== ev.payload.settings) {
+			await ev.action.setSettings(settings);
+		}
 		this.startTimers(runtime);
 		await this.refresh(runtime, { force: false });
 	}
@@ -105,6 +117,7 @@ export class SingleWindowAction extends SingletonAction<UsageActionSettings> {
 				provider: createProvider(displayConfig, usageConfig),
 				usageConfig,
 				displayConfig,
+				rawSettings,
 				dataTimer: undefined as unknown as ReturnType<typeof setInterval>,
 				tickTimer: undefined as unknown as ReturnType<typeof setInterval>,
 				lastSnapshot: existing?.lastSnapshot ?? null,
@@ -114,6 +127,8 @@ export class SingleWindowAction extends SingletonAction<UsageActionSettings> {
 		}
 
 		existing.action = keyAction;
+		existing.usageConfig = usageConfig;
+		existing.rawSettings = rawSettings;
 		return existing;
 	}
 
@@ -156,6 +171,7 @@ export class SingleWindowAction extends SingletonAction<UsageActionSettings> {
 			resetDisplay: runtime.displayConfig.resetDisplay,
 			dateFormat: runtime.displayConfig.dateFormat,
 			providerAccent: runtime.displayConfig.providerAccent,
+			displayMode: runtime.usageConfig.displayMode,
 		});
 		await runtime.action.setImage(toDataUrl(svg));
 	}

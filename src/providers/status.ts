@@ -1,5 +1,6 @@
 import { DEFAULT_THRESHOLDS } from "./types.ts";
 import type { StatusThresholds, UsageStatus, UsageWindow } from "./types.ts";
+import type { DisplayMode } from "../utils/usage-display.ts";
 
 /**
  * Map a single percentage to a usage status using the given thresholds.
@@ -9,8 +10,19 @@ import type { StatusThresholds, UsageStatus, UsageWindow } from "./types.ts";
  *   warning..critical-1 → warning
  *   critical..99  → critical
  *   100           → limited
+ * Remaining percentages reverse the comparisons; 0 remaining means limited.
  */
-export function statusForPercent(percent: number, thresholds: StatusThresholds = DEFAULT_THRESHOLDS): UsageStatus {
+export function statusForPercent(
+	percent: number,
+	thresholds: StatusThresholds = DEFAULT_THRESHOLDS,
+	displayMode: DisplayMode = "used",
+): UsageStatus {
+	if (displayMode === "remaining") {
+		if (percent <= 0) return "limited";
+		if (percent <= thresholds.critical) return "critical";
+		if (percent <= thresholds.warning) return "warning";
+		return "ok";
+	}
 	if (percent >= 100) {
 		return "limited";
 	}

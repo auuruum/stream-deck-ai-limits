@@ -6,6 +6,9 @@ import path from "node:path";
 import {
 	resolveUsageSettings,
 	resolveSingleWindowSettings,
+	initializeUsageSettings,
+	updateDisplayModeSettings,
+	sameResolvedSettings,
 	DEFAULT_INTERVAL_SEC,
 	MIN_INTERVAL_SEC,
 	MAX_INTERVAL_SEC,
@@ -83,6 +86,70 @@ test("valid full settings pass through", () => {
 	assert.equal(r.thresholds.warning, 60);
 	assert.equal(r.thresholds.critical, 85);
 	assert.equal(r.customCredentialsPath, "/home/u/.claude/.credentials.json");
+});
+
+test("new Codex key defaults are persisted as Remaining 20/10", () => {
+	const settings = initializeUsageSettings({}, "codex");
+	assert.deepEqual(settings, { displayMode: "remaining", warningThreshold: 20, criticalThreshold: 10 });
+	const saved = JSON.parse(JSON.stringify(settings));
+	assert.equal(saved.displayMode, "remaining");
+	assert.equal(initializeUsageSettings(saved, "codex"), saved);
+	const resolved = resolveUsageSettings(saved, "codex");
+	assert.equal(resolved.displayMode, "remaining");
+	assert.deepEqual(resolved.thresholds, { warning: 80, critical: 90 });
+});
+
+test("legacy and invalid Codex modes safely keep Used and existing thresholds", () => {
+	for (const displayMode of [undefined, "bad", null as unknown as string]) {
+		const settings = { refreshIntervalSec: 120, displayMode, warningThreshold: 75, criticalThreshold: 95 };
+		assert.equal(initializeUsageSettings(settings, "codex"), settings);
+		const resolved = resolveUsageSettings(settings, "codex");
+		assert.equal(resolved.displayMode, "used");
+		assert.deepEqual(resolved.thresholds, { warning: 75, critical: 95 });
+	}
+	assert.deepEqual(resolveUsageSettings({}, "codex").thresholds, { warning: 70, critical: 90 });
+});
+
+test("Codex mode-specific threshold defaults and invalid thresholds", () => {
+	assert.deepEqual(resolveUsageSettings({ displayMode: "used" }, "codex").thresholds, { warning: 80, critical: 90 });
+	assert.deepEqual(resolveUsageSettings({ displayMode: "remaining", warningThreshold: NaN }, "codex").thresholds,
+		{ warning: 80, critical: 90 });
+	assert.deepEqual(resolveUsageSettings({ displayMode: "remaining", warningThreshold: 20, criticalThreshold: 30 }, "codex").thresholds,
+		{ warning: 80, critical: 80 });
+});
+
+test("mode switching complements custom thresholds without changing provider/cache config", () => {
+	const used = { displayMode: "used", warningThreshold: 75, criticalThreshold: 95, customCredentialsPath: "/test/auth" };
+	const remaining = updateDisplayModeSettings(used, { ...used, displayMode: "remaining" }, "codex");
+	assert.equal(remaining.warningThreshold, 25);
+	assert.equal(remaining.criticalThreshold, 5);
+	assert.equal(remaining.customCredentialsPath, "/test/auth");
+	assert.ok(sameResolvedSettings(resolveUsageSettings(used, "codex"), resolveUsageSettings(remaining, "codex")));
+	assert.deepEqual(updateDisplayModeSettings(remaining, { ...remaining, displayMode: "used" }, "codex"), used);
+	assert.deepEqual(used, { displayMode: "used", warningThreshold: 75, criticalThreshold: 95, customCredentialsPath: "/test/auth" });
+});
+
+test("explicit thresholds sent with a mode switch are preserved", () => {
+	const used = { displayMode: "used", warningThreshold: 80, criticalThreshold: 90 };
+	const next = { displayMode: "remaining", warningThreshold: 25, criticalThreshold: 5 };
+	assert.equal(updateDisplayModeSettings(used, next, "codex"), next);
+});
+
+test("new single-window keys remember Remaining for Codex and keep other providers Used", () => {
+	const fresh = initializeUsageSettings({}, "claude");
+	assert.equal(fresh.displayMode, "remaining");
+	assert.equal(resolveUsageSettings(fresh).displayMode, "used");
+	const codex = updateDisplayModeSettings(fresh, { ...fresh, provider: "codex" });
+	assert.equal(resolveUsageSettings(codex).displayMode, "remaining");
+	assert.deepEqual([codex.warningThreshold, codex.criticalThreshold], [30, 10]);
+	for (const provider of ["claude", "copilot"]) {
+		const other = updateDisplayModeSettings(codex, { ...codex, provider });
+		assert.equal(resolveUsageSettings(other).displayMode, "used");
+		assert.deepEqual(resolveUsageSettings(other).thresholds, { warning: 70, critical: 90 });
+		const back = updateDisplayModeSettings(other, { ...other, provider: "codex" });
+		assert.equal(resolveUsageSettings(back).displayMode, "remaining");
+		assert.deepEqual([back.warningThreshold, back.criticalThreshold], [30, 10]);
+	}
 });
 
 test("single-window: copilot always resolves to the session window", () => {

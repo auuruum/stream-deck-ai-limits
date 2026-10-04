@@ -2,6 +2,7 @@ import { statusForPercent } from "../providers/status.ts";
 import type { StatusThresholds, UsageSnapshot, UsageWindow } from "../providers/types.ts";
 import { DEFAULT_THRESHOLDS } from "../providers/types.ts";
 import { formatCountdown, formatResetTime, type DateFormat } from "../utils/time.ts";
+import { convertThresholds, getDisplayPercent, type DisplayMode } from "../utils/usage-display.ts";
 import { paletteForStatus, providerColors, type Palette } from "./colors.ts";
 import { SIZE, escapeXml } from "./svg.ts";
 import type { ProviderAccent, ResetDisplay, WindowKind } from "../settings/usage-settings.ts";
@@ -11,6 +12,8 @@ export interface SingleWindowOptions {
 	resetDisplay: ResetDisplay;
 	dateFormat: DateFormat;
 	providerAccent: ProviderAccent;
+	/** Codex only; other providers always show usage. */
+	displayMode?: DisplayMode;
 	/** Injectable clock for the countdown (testability). */
 	now?: Date;
 }
@@ -32,12 +35,15 @@ export function renderSingleWindowIcon(snapshot: UsageSnapshot, options: SingleW
 	}
 
 	const win = selectWindow(snapshot, options.window);
-	if (win.usedPercent === null) {
+	const displayMode = snapshot.provider === "codex" ? options.displayMode ?? "used" : "used";
+	const displayPercent = getDisplayPercent(win.usedPercent, displayMode);
+	if (displayPercent === null) {
 		return renderMessage("error", label, "No Data");
 	}
 
-	const thresholds = snapshot.thresholds ?? DEFAULT_THRESHOLDS;
-	const accent = paletteForStatus(statusForPercent(win.usedPercent, thresholds)).accent;
+	const percent = Math.round(displayPercent);
+	const thresholds = convertThresholds(snapshot.thresholds ?? DEFAULT_THRESHOLDS, "used", displayMode);
+	const accent = paletteForStatus(statusForPercent(percent, thresholds, displayMode)).accent;
 	const palette = paletteForStatus("ok");
 	const resetLines = buildResetLines(win, options);
 	const winText = snapshot.provider === "copilot" ? "MO" : windowLabel(options.window);
@@ -55,7 +61,7 @@ export function renderSingleWindowIcon(snapshot: UsageSnapshot, options: SingleW
 	const winColor = provider.accent;
 	// On a tinted background the default dark track is barely visible — use a light track instead.
 	const trackColor = accentMode === "tint" ? "#b9b9be" : palette.track;
-	const body = renderGauge(win.usedPercent, accent, palette, winText, winColor, trackColor, resetLines.length);
+	const body = renderGauge(percent, accent, palette, winText, winColor, trackColor, resetLines.length);
 
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">
   <rect width="${SIZE}" height="${SIZE}" fill="${background}"/>
@@ -79,7 +85,7 @@ function renderGauge(
 	trackColor: string,
 	resetLineCount: number,
 ): string {
-	const pct = clampPct(percent);
+	const pct = percent;
 	const cx = SIZE / 2;
 	const cy = resetLineCount === 2 ? 60 : resetLineCount === 1 ? 66 : 74;
 	const r = 46;
@@ -203,8 +209,4 @@ function windowLabel(window: WindowKind): string {
 		default:
 			return "5H";
 	}
-}
-
-function clampPct(percent: number): number {
-	return Math.max(0, Math.min(100, Math.round(percent)));
 }

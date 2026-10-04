@@ -1,5 +1,6 @@
 import type { StatusThresholds, UsageProvider } from "../providers/types.ts";
 import type { DateFormat } from "../utils/time.ts";
+import { convertThresholds, type DisplayMode } from "../utils/usage-display.ts";
 
 /**
  * Settings persisted per usage key (Claude, Codex, or Copilot), edited via the Property
@@ -13,6 +14,8 @@ export type UsageActionSettings = {
 	warningThreshold?: number;
 	criticalThreshold?: number;
 	customCredentialsPath?: string;
+	/** Codex only; absent on legacy actions, which keep displaying usage. */
+	displayMode?: string;
 	// Single-window action only (ignored by the combined Claude/Codex/Copilot actions):
 	provider?: string;
 	window?: string;
@@ -38,11 +41,16 @@ export const MAX_INTERVAL_SEC = 3600;
 
 export const DEFAULT_WARNING_THRESHOLD = 70;
 export const DEFAULT_CRITICAL_THRESHOLD = 90;
+export const DEFAULT_CODEX_USED_WARNING = 80;
+export const DEFAULT_REMAINING_WARNING = 20;
+export const DEFAULT_REMAINING_CRITICAL = 10;
 
 /** Fully-resolved, validated configuration the action/provider actually run with. */
 export interface ResolvedUsageSettings {
 	intervalSec: number;
 	thresholds: StatusThresholds;
+	/** Display preference; thresholds above always remain in used-percent coordinates for providers/cache. */
+	displayMode: DisplayMode;
 	customCredentialsPath: string | undefined;
 }
 
@@ -50,15 +58,21 @@ export interface ResolvedUsageSettings {
  * Validate and normalize raw settings into a coherent {@link ResolvedUsageSettings}.
  *
  * - interval: clamped to [MIN, MAX], rounded; invalid → default.
- * - thresholds: clamped to 0..100, rounded; invalid → defaults; `critical` forced ≥ `warning`.
+ * - thresholds: clamped and rounded; converted to used-percent coordinates for providers.
+ * - display mode: Codex only; missing/invalid values keep legacy Used behavior.
  * - custom path: trimmed; empty → undefined (use the default credentials location).
  *
  * Bad input never throws — it falls back to defaults so the plugin keeps working.
  */
-export function resolveUsageSettings(settings: UsageActionSettings = {}): ResolvedUsageSettings {
+export function resolveUsageSettings(
+	settings: UsageActionSettings = {},
+	provider: UsageProvider = resolveSingleWindowSettings(settings).provider,
+): ResolvedUsageSettings {
+	const displayMode = provider === "codex" && settings.displayMode === "remaining" ? "remaining" : "used";
 	return {
 		intervalSec: resolveIntervalSec(settings.refreshIntervalSec),
-		thresholds: resolveThresholds(settings),
+		thresholds: convertThresholds(resolveThresholds(settings, displayMode, provider), displayMode, "used"),
+		displayMode,
 		customCredentialsPath: settings.customCredentialsPath?.trim() || undefined,
 	};
 }
@@ -70,10 +84,45 @@ export function resolveIntervalSec(value: number | undefined): number {
 	return Math.min(MAX_INTERVAL_SEC, Math.max(MIN_INTERVAL_SEC, Math.round(value)));
 }
 
-function resolveThresholds(settings: UsageActionSettings): StatusThresholds {
-	const warning = clampPercent(settings.warningThreshold, DEFAULT_WARNING_THRESHOLD);
-	const critical = clampPercent(settings.criticalThreshold, DEFAULT_CRITICAL_THRESHOLD);
-	return { warning, critical: Math.max(warning, critical) };
+function resolveThresholds(settings: UsageActionSettings, mode: DisplayMode, provider: UsageProvider): StatusThresholds {
+	const defaultWarning = mode === "remaining" ? DEFAULT_REMAINING_WARNING
+		: provider === "codex" && settings.displayMode === "used" ? DEFAULT_CODEX_USED_WARNING : DEFAULT_WARNING_THRESHOLD;
+	const defaultCritical = mode === "remaining" ? DEFAULT_REMAINING_CRITICAL : DEFAULT_CRITICAL_THRESHOLD;
+	const warning = clampPercent(settings.warningThreshold, defaultWarning);
+	const critical = clampPercent(settings.criticalThreshold, defaultCritical);
+	return { warning, critical: mode === "remaining" ? Math.min(warning, critical) : Math.max(warning, critical) };
+}
+
+/** An untouched key has no settings. Persist defaults once, before its first draw. */
+export function initializeUsageSettings(settings: UsageActionSettings, provider: UsageProvider): UsageActionSettings {
+	if (Object.keys(settings).length !== 0) {
+		return settings;
+	}
+	return {
+		displayMode: "remaining",
+		warningThreshold: provider === "codex" ? DEFAULT_REMAINING_WARNING : DEFAULT_WARNING_THRESHOLD,
+		criticalThreshold: provider === "codex" ? DEFAULT_REMAINING_CRITICAL : DEFAULT_CRITICAL_THRESHOLD,
+	};
+}
+
+/**
+ * A PI mode/provider switch keeps the same warning levels by complementing the thresholds.
+ * Explicit threshold edits arriving with the switch are respected instead.
+ */
+export function updateDisplayModeSettings(
+	previous: UsageActionSettings,
+	next: UsageActionSettings,
+	fixedProvider?: UsageProvider,
+): UsageActionSettings {
+	const before = resolveUsageSettings(previous, fixedProvider);
+	const after = resolveUsageSettings(next, fixedProvider);
+	if (before.displayMode === after.displayMode ||
+		previous.warningThreshold !== next.warningThreshold ||
+		previous.criticalThreshold !== next.criticalThreshold) {
+		return next;
+	}
+	const thresholds = convertThresholds(before.thresholds, "used", after.displayMode);
+	return { ...next, warningThreshold: thresholds.warning, criticalThreshold: thresholds.critical };
 }
 
 function clampPercent(value: number | undefined, fallback: number): number {

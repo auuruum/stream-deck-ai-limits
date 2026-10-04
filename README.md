@@ -3,7 +3,7 @@
 Show your **Claude Code**, **Codex CLI**, and **GitHub Copilot** usage limits right on your Elgato
 Stream Deck keys.
 
-Each key displays how much of your quota you've used, color-coded by how close you are to the
+Each key displays your quota percentage, color-coded by how close you are to the
 limit, and updates automatically. The windows differ per provider: Claude and Codex have a rolling
 **5-hour** and **weekly** quota, while Copilot instead has a single **monthly premium-interactions**
 quota. No tokens to paste — the plugin reads the credentials the official CLIs already created when
@@ -27,6 +27,8 @@ Four action types (drag any of them onto a key):
 | **Usage (single window)** | One provider + one window, larger, with the reset date/time and/or countdown |
 
 Color bands (configurable): `0–69%` green · `70–89%` yellow · `90–99%` orange · `100%` red.
+These bands describe the original Used mode. Codex can also show quota Remaining, where lower
+percentages indicate less available quota.
 
 ---
 
@@ -75,7 +77,12 @@ Select a key to configure it:
 
 - **Refresh interval** — how often to poll (60–600 s, default 120 s). The minimum is 60 s on
   purpose; see [Polling & rate limits](#polling--rate-limits).
+- **Display mode** — Codex only, in both **Codex Usage** and **Usage (single window)** when
+  Provider is Codex. Choose **Remaining** (`100 − used`, clamped to 0–100) or **Used**. The
+  percentage and bar/gauge always show the same value; unknown usage stays unknown.
 - **Warning / Critical thresholds** — the percentages at which a bar turns yellow / orange.
+  Used triggers at or above the threshold; Remaining triggers at or below it. Critical takes
+  priority, and exhausted quota (100% used / 0% remaining) is red.
 - **Credentials path** — optional override if your credentials file is in a non-standard location.
   Leave empty to use the default. Setting this opts out of the macOS Keychain lookup: an explicit
   path is taken at face value, so a missing file there is reported as an error.
@@ -113,6 +120,32 @@ action fixes its window to the session.
   dropdown to the session for Copilot.
 
 Changes apply live — no need to restart the plugin.
+
+New Codex Usage keys default to Remaining with warning **20%** / critical **10%**. Existing
+configured keys without a display-mode setting keep Used and their existing thresholds. New
+single-window keys remember Remaining for Codex while initially showing Claude as before;
+choosing Codex converts the current thresholds (Claude's default 70/90 becomes 30/10 remaining).
+Switching modes converts custom thresholds to preserve the same warning levels: Used 80/90
+becomes Remaining 20/10 and converts back on the next switch. Switching the single-window
+provider also preserves those levels; Claude and Copilot always display Used. An explicit
+threshold edit sent together with a mode change is kept as entered.
+
+The mode and thresholds are saved in the action's Stream Deck settings, so each key keeps its
+choice across restarts, profile switches, and action reloads. Authentication, polling, API data,
+and reset times are unchanged.
+
+To build an installer using the project's Elgato CLI dependency:
+
+```bash
+npm ci
+npm test
+npm run lint:tsc
+npm run build
+npx streamdeck pack com.singerous.ai-limits.sdPlugin --output dist --no-update-check
+```
+
+The installer is `dist/com.singerous.ai-limits.streamDeckPlugin`. Packaging validates the plugin
+before creating it; see the [Elgato pack command](https://docs.elgato.com/streamdeck/cli/commands/pack/).
 
 ---
 
