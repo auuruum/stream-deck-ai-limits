@@ -35,6 +35,18 @@
 			</div>
 		</sdpi-item>
 
+		<sdpi-item label="Reset info">
+			<sdpi-select setting="resetDisplay" default="countdown">
+				<option value="countdown">Countdown</option>
+				<option value="datetime">Day &amp; time</option>
+				<option value="none">Hidden</option>
+			</sdpi-select>
+		</sdpi-item>
+		<sdpi-item>
+			<small style="color: var(--sdpi-color-muted, #999);">
+				Under each bar: 2h30m or Tue 14:30 (local time).
+			</small>
+		</sdpi-item>
 		<sdpi-item label="Credentials path">
 			<sdpi-textfield
 				setting="customCredentialsPath"

@@ -89,6 +89,12 @@ Select a key to configure it:
 - **Credentials path** — optional override if your credentials file is in a non-standard location.
   Leave empty to use the default. Setting this opts out of the macOS Keychain lookup: an explicit
   path is taken at face value, so a missing file there is reported as an error.
+- **Reset info** — on combined Claude/Codex keys, choose **Countdown** (default, `2h30m` / `3d3h`),
+  **Day & time** (`Tue 14:30`, in your computer's local time), or **Hidden**. Both quota percentages
+  and full-width bars stay visible. Each reset uses one 22 px line with an SVG clock, rather than
+  small date/countdown footnotes. Hidden restores the original layout. Missing reset times are
+  omitted. Countdown redraws once per minute from cached data, without extra API requests.
+  Each key saves its own choice; the existing single-window and Copilot layouts are unchanged.
 
 The **single-window** action adds: **Provider** (Claude/Codex/Copilot), **Window** (5-hour / weekly,
 plus Fable 7-day for Claude only; a Copilot key always shows its monthly quota and ignores this

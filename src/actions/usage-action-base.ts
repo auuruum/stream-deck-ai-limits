@@ -28,6 +28,8 @@ interface KeyRuntime {
 	config: ResolvedUsageSettings;
 	rawSettings: UsageActionSettings;
 	timer: ReturnType<typeof setInterval>;
+	tickTimer: ReturnType<typeof setInterval> | undefined;
+	lastSnapshot: UsageSnapshot | null;
 }
 
 /**
@@ -62,6 +64,7 @@ export abstract class UsageActionBase extends SingletonAction<UsageActionSetting
 		const runtime = this.instances.get(ev.action.id);
 		if (runtime) {
 			clearInterval(runtime.timer);
+			clearInterval(runtime.tickTimer);
 			this.instances.delete(ev.action.id);
 		}
 	}
@@ -98,6 +101,7 @@ export abstract class UsageActionBase extends SingletonAction<UsageActionSetting
 		if (!existing || !sameResolvedSettings(existing.config, resolved)) {
 			if (existing) {
 				clearInterval(existing.timer);
+				clearInterval(existing.tickTimer);
 			}
 			const runtime: KeyRuntime = {
 				action: keyAction,
@@ -105,6 +109,8 @@ export abstract class UsageActionBase extends SingletonAction<UsageActionSetting
 				config: resolved,
 				rawSettings,
 				timer: undefined as unknown as ReturnType<typeof setInterval>,
+				tickTimer: undefined,
+				lastSnapshot: null,
 			};
 			this.instances.set(keyAction.id, runtime);
 			return runtime;
@@ -118,9 +124,15 @@ export abstract class UsageActionBase extends SingletonAction<UsageActionSetting
 
 	private startTimer(runtime: KeyRuntime): void {
 		clearInterval(runtime.timer);
+		clearInterval(runtime.tickTimer);
 		runtime.timer = setInterval(() => {
 			void this.refresh(runtime, { force: false });
 		}, runtime.config.intervalSec * 1000);
+		if (this.providerId !== "copilot" && runtime.config.resetDisplay === "countdown") {
+			runtime.tickTimer = setInterval(() => {
+				if (runtime.lastSnapshot) void this.draw(runtime, runtime.lastSnapshot);
+			}, 60_000);
+		}
 	}
 
 	private async refresh(runtime: KeyRuntime, options: { force: boolean }): Promise<void> {
@@ -139,6 +151,11 @@ export abstract class UsageActionBase extends SingletonAction<UsageActionSetting
 				stale: false,
 			};
 		}
-		await runtime.action.setImage(toDataUrl(renderUsageIcon(snapshot, new Date(), runtime.config.displayMode)));
+		runtime.lastSnapshot = snapshot;
+		await this.draw(runtime, snapshot);
+	}
+
+	private async draw(runtime: KeyRuntime, snapshot: UsageSnapshot): Promise<void> {
+		await runtime.action.setImage(toDataUrl(renderUsageIcon(snapshot, new Date(), runtime.config.displayMode, runtime.config.resetDisplay)));
 	}
 }

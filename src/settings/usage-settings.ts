@@ -16,10 +16,11 @@ export type UsageActionSettings = {
 	customCredentialsPath?: string;
 	/** Codex only; absent on legacy actions, which keep displaying usage. */
 	displayMode?: string;
+	/** Combined Claude/Codex keys: one readable reset line per quota. */
+	resetDisplay?: string;
 	// Single-window action only (ignored by the combined Claude/Codex/Copilot actions):
 	provider?: string;
 	window?: string;
-	resetDisplay?: string;
 	dateFormat?: string;
 	providerAccent?: string;
 };
@@ -51,6 +52,7 @@ export interface ResolvedUsageSettings {
 	thresholds: StatusThresholds;
 	/** Display preference; thresholds above always remain in used-percent coordinates for providers/cache. */
 	displayMode: DisplayMode;
+	resetDisplay: CombinedResetDisplay;
 	customCredentialsPath: string | undefined;
 }
 
@@ -73,6 +75,7 @@ export function resolveUsageSettings(
 		intervalSec: resolveIntervalSec(settings.refreshIntervalSec),
 		thresholds: convertThresholds(resolveThresholds(settings, displayMode, provider), displayMode, "used"),
 		displayMode,
+		resetDisplay: pickEnum<CombinedResetDisplay>(settings.resetDisplay, ["none", "countdown", "datetime"], "countdown"),
 		customCredentialsPath: settings.customCredentialsPath?.trim() || undefined,
 	};
 }
@@ -147,6 +150,7 @@ export function sameResolvedSettings(a: ResolvedUsageSettings, b: ResolvedUsageS
 export type WindowKind = "session" | "weekly" | "fable";
 /** What reset info to show under the percentage. */
 export type ResetDisplay = "datetime" | "countdown" | "both" | "none";
+export type CombinedResetDisplay = Exclude<ResetDisplay, "both">;
 /** How to tint the key with the provider's brand color. */
 export type ProviderAccent = "frame" | "tint" | "none";
 
