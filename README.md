@@ -77,8 +77,8 @@ Select a key to configure it:
 
 - **Refresh interval** — how often to poll (60–600 s, default 120 s). The minimum is 60 s on
   purpose; see [Polling & rate limits](#polling--rate-limits).
-- **Display mode** — Codex only, in both **Codex Usage** and **Usage (single window)** when
-  Provider is Codex. Choose **Remaining** (`100 − used`, clamped to 0–100) or **Used**. The
+- **Display mode** — available in **Claude Usage**, **Codex Usage**, and **Usage (single window)**
+  when Provider is Claude or Codex. Choose **Remaining** (`100 − used`, clamped to 0–100) or **Used**. The
   percentage and bar/gauge always show the same value; unknown usage stays unknown.
 - **Warning / Critical thresholds** — the percentages at which a bar turns yellow / orange.
   Used triggers at or above the threshold; Remaining triggers at or below it. Critical takes
@@ -136,7 +136,9 @@ single-window keys remember Remaining for Codex while initially showing Claude a
 choosing Codex converts the current thresholds (Claude's default 70/90 becomes 30/10 remaining).
 Switching modes converts custom thresholds to preserve the same warning levels: Used 80/90
 becomes Remaining 20/10 and converts back on the next switch. Switching the single-window
-provider also preserves those levels; Claude and Copilot always display Used. An explicit
+provider also preserves those levels; Copilot always displays Used. Claude and Codex remember
+their modes separately in the single-window action. Existing Claude keys keep Used until you
+choose Remaining; legacy single-window keys also keep their previous display and thresholds. An explicit
 threshold edit sent together with a mode change is kept as entered.
 
 The mode and thresholds are saved in the action's Stream Deck settings, so each key keeps its

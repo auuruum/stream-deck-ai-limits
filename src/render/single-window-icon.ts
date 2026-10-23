@@ -12,7 +12,7 @@ export interface SingleWindowOptions {
 	resetDisplay: ResetDisplay;
 	dateFormat: DateFormat;
 	providerAccent: ProviderAccent;
-	/** Codex only; other providers always show usage. */
+	/** Claude/Codex; Copilot always shows usage. */
 	displayMode?: DisplayMode;
 	/** Injectable clock for the countdown (testability). */
 	now?: Date;
@@ -35,7 +35,7 @@ export function renderSingleWindowIcon(snapshot: UsageSnapshot, options: SingleW
 	}
 
 	const win = selectWindow(snapshot, options.window);
-	const displayMode = snapshot.provider === "codex" ? options.displayMode ?? "used" : "used";
+	const displayMode = snapshot.provider === "copilot" ? "used" : options.displayMode ?? "used";
 	const displayPercent = getDisplayPercent(win.usedPercent, displayMode);
 	if (displayPercent === null) {
 		return renderMessage("error", label, "No Data");

@@ -2,6 +2,7 @@
 (() => {
 	const client = SDPIComponents.streamDeckClient;
 	const modeSelect = document.querySelector('[setting="displayMode"]');
+	const claudeModeSelect = document.querySelector('[setting="claudeDisplayMode"]');
 	const providerSelect = document.querySelector('[setting="provider"]');
 	const warningInput = document.querySelector('[data-number-setting="warningThreshold"]');
 	const criticalInput = document.querySelector('[data-number-setting="criticalThreshold"]');
@@ -11,10 +12,11 @@
 		settings = next;
 		const provider = document.body.dataset.provider || settings.provider || "claude";
 		const codex = provider === "codex";
-		const remaining = codex && settings.displayMode === "remaining";
-		for (const id of ["display-mode-item", "display-mode-help-item"]) {
+		const claude = provider === "claude";
+		const remaining = claude ? settings.claudeDisplayMode === "remaining" : codex && settings.displayMode === "remaining";
+		for (const [id, visible] of [["display-mode-item", codex], ["claude-display-mode-item", claude], ["display-mode-help-item", codex || claude]]) {
 			const item = document.getElementById(id);
-			if (item) item.style.display = codex ? "" : "none";
+			if (item) item.style.display = visible ? "" : "none";
 		}
 		document.getElementById("display-mode-help").textContent = remaining
 			? "Remaining quota. Colors change at or below the thresholds. Switching modes converts thresholds to preserve warning levels."
@@ -32,6 +34,7 @@
 	client.didReceiveSettings.subscribe((event) => render(event.payload.settings));
 	client.getSettings().then((payload) => render(payload.settings));
 	// PI edits can precede the plugin's settings reply. Update help immediately as well.
-	modeSelect.addEventListener("valuechange", () => render({ ...settings, displayMode: modeSelect.value }));
+	modeSelect?.addEventListener("valuechange", () => render({ ...settings, displayMode: modeSelect.value }));
+	claudeModeSelect?.addEventListener("valuechange", () => render({ ...settings, claudeDisplayMode: claudeModeSelect.value }));
 	providerSelect?.addEventListener("valuechange", () => render({ ...settings, provider: providerSelect.value }));
 })();

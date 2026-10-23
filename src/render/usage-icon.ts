@@ -37,7 +37,7 @@ export function renderUsageIcon(snapshot: UsageSnapshot, now: Date = new Date(),
 		return renderMessage("error", [label, "No", "Data"]);
 	}
 
-	return renderBars(snapshot, now, snapshot.provider === "codex" ? displayMode : "used", resetDisplay);
+	return renderBars(snapshot, now, snapshot.provider === "copilot" ? "used" : displayMode, resetDisplay);
 }
 
 /** Short display name shown on the key for each provider. */

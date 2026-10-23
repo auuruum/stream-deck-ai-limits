@@ -4,6 +4,7 @@ import type { DidReceiveSettingsEvent, WillAppearEvent, WillDisappearEvent } fro
 
 import { UsageActionBase } from "../src/actions/usage-action-base.ts";
 import { normalizeCodexUsage } from "../src/providers/codex/codex-normalizer.ts";
+import { normalizeClaudeUsage } from "../src/providers/claude/claude-normalizer.ts";
 import type { Provider, UsageProvider } from "../src/providers/types.ts";
 import type { ResolvedUsageSettings, UsageActionSettings } from "../src/settings/usage-settings.ts";
 
@@ -20,6 +21,18 @@ class TestCodexAction extends UsageActionBase {
 				secondary_window: { used_percent: 39, reset_at: Date.now() / 1000 + 172800 },
 			} }, config.thresholds);
 		} };
+	}
+}
+
+class TestClaudeAction extends UsageActionBase {
+	protected readonly providerId = "claude" as const;
+	providerCount = 0;
+	protected override createProvider(config: ResolvedUsageSettings): Provider {
+		this.providerCount++;
+		return { getUsage: async () => normalizeClaudeUsage({
+			five_hour: { utilization: 99, resets_at: "2026-10-23T10:00:00Z" },
+			seven_day: { utilization: 37, resets_at: "2026-10-28T10:00:00Z" },
+		}, config.thresholds) };
 	}
 }
 
@@ -116,6 +129,35 @@ test("multiple keys keep independent display preferences", async () => {
 	} finally {
 		action.onWillDisappear(disappear(remaining));
 		action.onWillDisappear(disappear(used));
+	}
+});
+
+test("Claude switches Used/Remaining live, preserves threshold colors and persists across reloads", async () => {
+	const action = new TestClaudeAction();
+	const button = key("claude", { warningThreshold: 70, criticalThreshold: 90, resetDisplay: "datetime" });
+	try {
+		await action.onWillAppear(appear(button));
+		assert.match(button.svg, />99%</);
+		assert.match(button.svg, />37%</);
+		await action.onDidReceiveSettings(update(button, { ...button.settings, claudeDisplayMode: "remaining" }));
+		assert.match(button.svg, />1%</);
+		assert.match(button.svg, />63%</);
+		assert.deepEqual([button.settings.warningThreshold, button.settings.criticalThreshold], [30, 10]);
+		assert.equal(action.providerCount, 1);
+	} finally {
+		action.onWillDisappear(disappear(button));
+	}
+	const restarted = new TestClaudeAction();
+	try {
+		await restarted.onWillAppear(appear(button));
+		assert.match(button.svg, />1%</);
+		assert.match(button.svg, />63%</);
+		assert.equal(button.settings.claudeDisplayMode, "remaining");
+		await restarted.onDidReceiveSettings(update(button, { ...button.settings, claudeDisplayMode: "used" }));
+		assert.match(button.svg, />99%</);
+		assert.deepEqual([button.settings.warningThreshold, button.settings.criticalThreshold], [70, 90]);
+	} finally {
+		restarted.onWillDisappear(disappear(button));
 	}
 });
 

@@ -16,6 +16,8 @@ export type UsageActionSettings = {
 	customCredentialsPath?: string;
 	/** Codex only; absent on legacy actions, which keep displaying usage. */
 	displayMode?: string;
+	/** Separate from Codex: legacy single-window keys already store its hidden displayMode. */
+	claudeDisplayMode?: string;
 	/** Combined Claude/Codex keys: one readable reset line per quota. */
 	resetDisplay?: string;
 	// Single-window action only (ignored by the combined Claude/Codex/Copilot actions):
@@ -61,7 +63,7 @@ export interface ResolvedUsageSettings {
  *
  * - interval: clamped to [MIN, MAX], rounded; invalid → default.
  * - thresholds: clamped and rounded; converted to used-percent coordinates for providers.
- * - display mode: Codex only; missing/invalid values keep legacy Used behavior.
+ * - display mode: Claude/Codex; missing/invalid values keep legacy Used behavior.
  * - custom path: trimmed; empty → undefined (use the default credentials location).
  *
  * Bad input never throws — it falls back to defaults so the plugin keeps working.
@@ -70,7 +72,8 @@ export function resolveUsageSettings(
 	settings: UsageActionSettings = {},
 	provider: UsageProvider = resolveSingleWindowSettings(settings).provider,
 ): ResolvedUsageSettings {
-	const displayMode = provider === "codex" && settings.displayMode === "remaining" ? "remaining" : "used";
+	const preference = provider === "claude" ? settings.claudeDisplayMode : settings.displayMode;
+	const displayMode = provider !== "copilot" && preference === "remaining" ? "remaining" : "used";
 	return {
 		intervalSec: resolveIntervalSec(settings.refreshIntervalSec),
 		thresholds: convertThresholds(resolveThresholds(settings, displayMode, provider), displayMode, "used"),

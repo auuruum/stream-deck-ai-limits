@@ -28,8 +28,8 @@ test("both quotas keep their percentages and full-width bars alongside readable 
 			const svg = renderUsageIcon({ ...snapshot, provider }, now, mode, "countdown");
 			assert.match(svg, />5H</);
 			assert.match(svg, />W</);
-			assert.match(svg, provider === "codex" && mode === "remaining" ? />68%</ : />32%</);
-			assert.match(svg, provider === "codex" && mode === "remaining" ? />61%</ : />39%</);
+			assert.match(svg, mode === "remaining" ? />68%</ : />32%</);
+			assert.match(svg, mode === "remaining" ? />61%</ : />39%</);
 			assert.match(svg, /font-size="22"[^>]*>2h30m</);
 			assert.match(svg, /font-size="22"[^>]*>3d3h</);
 			assert.match(svg, /y="36" width="120" height="8"/);

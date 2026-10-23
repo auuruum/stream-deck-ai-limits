@@ -114,14 +114,12 @@ test("Remaining rendering retains reset countdowns and stale markers", () => {
 	assert.match(renderUsageIcon(data, now, "remaining"), /<circle/);
 });
 
-test("Claude and Copilot ignore the Codex display preference in both renderers", () => {
-	for (const provider of ["claude", "copilot"] as const) {
-		const data = { ...snapshot(), provider };
-		const dual = renderUsageIcon(data, now, "remaining");
-		assert.match(dual, />32%</);
-		assert.doesNotMatch(dual, />68%</);
-		const single = renderSingleWindowIcon(data, { ...options, displayMode: "remaining" });
-		assert.match(single, />32<tspan/);
-		assert.doesNotMatch(single, />68<tspan/);
-	}
+test("Copilot ignores the display preference in both renderers", () => {
+	const data = { ...snapshot(), provider: "copilot" as const };
+	const dual = renderUsageIcon(data, now, "remaining");
+	assert.match(dual, />32%</);
+	assert.doesNotMatch(dual, />68%</);
+	const single = renderSingleWindowIcon(data, { ...options, displayMode: "remaining" });
+	assert.match(single, />32<tspan/);
+	assert.doesNotMatch(single, />68<tspan/);
 });
